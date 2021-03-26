@@ -89,6 +89,7 @@ public class ClientObject
                 }
                 else if(!gotTheRole)
                 {
+                    //test
                     data = Encoding.UTF8.GetBytes("Choose youre desteny. Are you the master? (Y/N)");
                     stream.Write(data, 0, data.Length);
 
