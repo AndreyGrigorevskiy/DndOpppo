@@ -71,8 +71,21 @@ public class ClientObject
             byte[] data = new byte[64]; // буфер для получаемых данных
             while (true)
             {
-                // получаем сообщение
                 StringBuilder builder = new StringBuilder();
+                if (!isNamed)
+                {
+                    data = Encoding.UTF8.GetBytes("Enter name:");
+                    stream.Write(data, 0, data.Length);
+                }
+                else if (!gotTheRole)
+                {
+                    data = Encoding.UTF8.GetBytes("Choose youre desteny. Are you the master? (Y/N)");
+                    stream.Write(data, 0, data.Length);
+
+                }
+
+                // получаем сообщение
+                
                 int bytes = 0;
                 do
                 {
@@ -81,19 +94,27 @@ public class ClientObject
                 }
                 while (stream.DataAvailable);
 
+
+                String checkMess = builder.ToString();
+                
+
+                if(checkMess.IndexOf(":msg:")!=-1)
+                {
+                   checkMess = checkMess.Remove(0, checkMess.IndexOf(":msg:") + 5);
+                }
+                else
+                {
+                    continue;
+                }
+
+                
                 if(!isNamed)
                 {
-                    data = Encoding.UTF8.GetBytes("Enter name:");
-                    stream.Write(data, 0, data.Length);
-                    setName(builder.ToString());
+                    setName(checkMess);
                 }
                 else if(!gotTheRole)
                 {
-                    //test
-                    data = Encoding.UTF8.GetBytes("Choose youre desteny. Are you the master? (Y/N)");
-                    stream.Write(data, 0, data.Length);
-
-                    if (builder.ToString().Equals("Y"))
+                    if (checkMess.Equals("Y")) 
                     {
                         setPlayerRole(MASTER);
                     }
@@ -101,51 +122,53 @@ public class ClientObject
                     {
                         setPlayerRole(PLAYER);
                     }
-                    
                 }
+                    
 
                 string message = "";
 
                 if (this.playerRole == MASTER)
                 {
-                     message = "[" + name + "] : [Master] =>" + builder.ToString();
+                     message = "[" + name + "] : [Master] =>" + checkMess;
                 }
                 else
                 {
-                    message = "[" + name + "] : [Player] =>" + builder.ToString();
+                    message = "[" + name + "] : [Player] =>" + checkMess;
                 }
 
-                if (string.Compare(builder.ToString(), "!d20", StringComparison.InvariantCultureIgnoreCase) == 0)
+                
+
+                if (string.Compare(checkMess, "!d20", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(20);
                 }
 
-                if (string.Compare(builder.ToString(), "!d16", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Compare(checkMess, "!d16", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(16);
                 }
 
-                if (string.Compare(builder.ToString(), "!d12", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Compare(checkMess, "!d12", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(12);
                 }
 
-                if (string.Compare(builder.ToString(), "!d10", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Compare(checkMess, "!d10", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(10);
                 }
 
-                if (string.Compare(builder.ToString(), "!d8", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Compare(checkMess, "!d8", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(8);
                 }
 
-                if (string.Compare(builder.ToString(), "!d6", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Compare(checkMess, "!d6", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(6);
                 }
 
-                if (string.Compare(builder.ToString(), "!d4", StringComparison.InvariantCultureIgnoreCase) == 0)
+                if (string.Compare(checkMess, "!d4", StringComparison.InvariantCultureIgnoreCase) == 0)
                 {
                     message += " = " + dX(4);
                 }
@@ -178,17 +201,29 @@ public class ClientObject
         {
             try
             {
-                listener = new TcpListener(IPAddress.Parse("10.3.224.240"), port);
+                listener = new TcpListener(IPAddress.Parse("192.168.9.5"), port);
                 listener.Start();
                 Console.WriteLine("Ожидание подключений...");
-
+                bool master = false;
                 while (true)
                 {
                     TcpClient client = listener.AcceptTcpClient();
                     ClientObject clientObject = new ClientObject(client);
+                    
+                    if(clientObject.getPlayerRole()==MASTER)
+                    {
+                        master = true;
+                    }
+                    if (master && clientObject.getPlayerRole() != MASTER)
+                    {
+                        clientObject.setPlayerRole(PLAYER);
+
+                    }
                     // создаем новый поток для обслуживания нового клиента
                     Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
+                    Console.WriteLine(client.Client.ToString());
                     clientThread.Start();
+                    
                 }
             }
             catch (Exception ex)
