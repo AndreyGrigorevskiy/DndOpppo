@@ -23,11 +23,71 @@ public class ClientObject
     private String name = "Noname";
     private bool isNamed = false;
     private bool gotTheRole = false;
+    private int maxHp = 10;
+    private int curentHp = 10;
+    private String[] inventory = new String[5];
 
 
     public ClientObject(TcpClient tcpClient)
     {
         client = tcpClient;
+        for(int i = 0; i< inventory.Length; i++)
+        {
+            inventory[i] = "";
+        }
+    }
+
+    public void heal(int count)
+    {
+        if(count+curentHp>maxHp)
+        {
+            curentHp = maxHp;
+        }
+        else
+        {
+            curentHp += count;
+        }
+    }
+
+    public void takeGMG(int count)
+    {
+        curentHp -= count;
+    }
+
+    public void take(String item)
+    {
+        bool empty = true;
+        for(int i = 0; i<inventory.Length;i++)
+        {
+            
+            if(String.IsNullOrEmpty(inventory[i]))
+            {
+                inventory[i] = item;
+                empty = false;
+                break;
+            }
+        }
+        if(empty)
+        {
+            inventory[0] = item;
+        }
+    }
+
+    public void drop(int num)
+    {
+        inventory[num - 1] = "";
+    }
+
+    public void drop(String item)
+    {
+        for(int i = 0; i< inventory.Length; i++)
+        {
+            if(String.Equals(inventory[i],item))
+            {
+                inventory[i] = "";
+                break;
+            }
+        }
     }
 
     public void setPlayerRole(int role)
@@ -172,6 +232,51 @@ public class ClientObject
                 {
                     message += " = " + dX(4);
                 }
+
+                if (checkMess.Contains("!heal"))
+                {
+                    checkMess = checkMess.Remove(0, 5);
+                    try {
+                        heal(Convert.ToInt32(checkMess));
+                    }
+                    catch(Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
+                    
+                    message += "current HP = " + curentHp;
+                }
+
+                if (checkMess.Contains("!dmg"))
+                {
+                    checkMess = checkMess.Remove(0, 4);
+                    takeGMG(Convert.ToInt32(checkMess));
+                    message += "current HP = " + curentHp;
+                }
+
+                if (checkMess.Contains("!take"))
+                {
+                    checkMess = checkMess.Remove(0, 5);
+                    take(checkMess);
+                }
+
+                if (string.Compare(checkMess, "!drop", StringComparison.InvariantCultureIgnoreCase) == 0)
+                {
+                    checkMess = checkMess.Remove(0, 5);
+                    drop(checkMess);
+                }
+
+                if (string.Compare(checkMess, "!stat", StringComparison.InvariantCultureIgnoreCase) == 0)
+                {
+                    message += "hp("+curentHp+"/"+maxHp+")";
+                    message += "  inventory : ";
+                    for(int i = 0;  i<inventory.Length; i++)
+                    {
+                        message += " -" + i + " " + inventory[i] + "- ";
+                    }
+                }
+
+                
 
                 Console.WriteLine(message);
                 // отправляем обратно сообщение в верхнем регистре
