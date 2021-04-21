@@ -3,11 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Text;
-
-
-
-
-
+using System.Collections.Generic;
 
 public class ClientObject
 {
@@ -15,9 +11,12 @@ public class ClientObject
     private const int MASTER = 1;
     private const int PLAYER = 0;
 
+    private NetworkStream stream;
+
 
     public TcpClient client;
 
+    public static List<ClientObject> myConections = new List<ClientObject>();
 
     private int playerRole = PLAYER;
     private String name = "Noname";
@@ -26,6 +25,8 @@ public class ClientObject
     private int maxHp = 10;
     private int curentHp = 10;
     private String[] inventory = new String[5];
+    private static bool master = false;
+
 
 
     public ClientObject(TcpClient tcpClient)
@@ -35,6 +36,12 @@ public class ClientObject
         {
             inventory[i] = "";
         }
+         stream = null;
+    }
+
+    public ClientObject(ClientObject clientObject)
+    {
+        client = clientObject.client;
     }
 
     public void heal(int count)
@@ -124,7 +131,7 @@ public class ClientObject
     public void Process()
     {
         Console.OutputEncoding = Encoding.UTF8;
-        NetworkStream stream = null;
+        
         try
         {
             stream = client.GetStream();
@@ -139,7 +146,7 @@ public class ClientObject
                 }
                 else if (!gotTheRole)
                 {
-                    data = Encoding.UTF8.GetBytes("Choose youre desteny. Are you the master? (Y/N)");
+                    data = Encoding.UTF8.GetBytes("Choose youre desteny. Are you the master? (Y/N) \n");
                     stream.Write(data, 0, data.Length);
 
                 }
@@ -156,9 +163,15 @@ public class ClientObject
 
 
                 String checkMess = builder.ToString();
-                
 
-                if(checkMess.IndexOf(":msg:")!=-1)
+                if (checkMess.IndexOf(":dst:")!=-1)
+                {
+                    Console.WriteLine(checkMess+name + "disconected");
+                    
+                    break;
+                }
+
+                if (checkMess.IndexOf(":msg:")!=-1)
                 {
                    checkMess = checkMess.Remove(0, checkMess.IndexOf(":msg:") + 5);
                 }
@@ -167,8 +180,8 @@ public class ClientObject
                     continue;
                 }
 
-                
-                if(!isNamed)
+
+                if (!isNamed)
                 {
                     setName(checkMess);
                 }
@@ -177,6 +190,7 @@ public class ClientObject
                     if (checkMess.Equals("Y")) 
                     {
                         setPlayerRole(MASTER);
+                        setMaster(true);
                     }
                     else
                     {
@@ -187,7 +201,7 @@ public class ClientObject
 
                 string message = "";
 
-                if (this.playerRole == MASTER)
+                if (playerRole == MASTER)
                 {
                      message = "[" + name + "] : [Master] =>" + checkMess;
                 }
@@ -276,13 +290,27 @@ public class ClientObject
                     }
                 }
 
-                
+
 
                 Console.WriteLine(message);
                 // отправляем обратно сообщение в верхнем регистре
                 message += "\n";
                 data = Encoding.UTF8.GetBytes(message);
-                stream.Write(data, 0, data.Length);
+                if (!isNamed)
+                {
+                    stream.Write(data, 0, data.Length);
+                }
+                else if (!gotTheRole)
+                {
+                    stream.Write(data, 0, data.Length);
+
+                }
+                else
+                {
+                    sendALL(data);
+                }
+                
+                
             }
         }
         catch (Exception ex)
@@ -298,35 +326,66 @@ public class ClientObject
         }
     }
 
+    public void sendALL(byte[] data)
+    {
+        foreach(ClientObject client in myConections)
+        {
+            client.stream.Write(data, 0, data.Length);
+        }
+    }
+
+    public void sendByName(byte[] data,string name)
+    {
+        foreach (ClientObject client in myConections)
+        {
+            if(client.getName().Equals(name))
+            {
+                client.stream.Write(data, 0, data.Length);
+            }
+        }
+    }
+
+    public void setMaster(bool role)
+    {
+        master = role;
+    }
+
     class Program
     {
+
         const int port = 9090;
+        static String host = System.Net.Dns.GetHostName();
+        static String ip = IPAddress.Any.ToString();
         static TcpListener listener;
+        
+
+        
+
         static void Main(string[] args)
-        {
+        {            
+            
             try
             {
-                listener = new TcpListener(IPAddress.Parse("192.168.9.5"), port);
+                listener = new TcpListener(IPAddress.Any, port);
                 listener.Start();
+                Console.WriteLine(ip);
                 Console.WriteLine("Ожидание подключений...");
-                bool master = false;
+                
                 while (true)
                 {
                     TcpClient client = listener.AcceptTcpClient();
-                    ClientObject clientObject = new ClientObject(client);
+                    myConections.Add(new ClientObject(client));
+                    //ClientObject clientObject = new ClientObject(client);
                     
-                    if(clientObject.getPlayerRole()==MASTER)
+                    if (master)
                     {
-                        master = true;
+                        myConections[myConections.Count - 1].setPlayerRole(PLAYER);
                     }
-                    if (master && clientObject.getPlayerRole() != MASTER)
-                    {
-                        clientObject.setPlayerRole(PLAYER);
 
-                    }
                     // создаем новый поток для обслуживания нового клиента
-                    Thread clientThread = new Thread(new ThreadStart(clientObject.Process));
-                    Console.WriteLine(client.Client.ToString());
+                    
+                    Thread clientThread = new Thread(new ThreadStart(myConections[myConections.Count-1].Process));
+                    Console.WriteLine(myConections[myConections.Count-1].name);
                     clientThread.Start();
                     
                 }
